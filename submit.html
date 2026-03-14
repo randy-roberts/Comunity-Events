@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Submit a Community Event</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, sans-serif; background: #f9f9f7; color: #1a1a1a; padding: 2rem 1rem; }
+  .container { max-width: 640px; margin: 0 auto; }
+  h1 { font-size: 24px; font-weight: 600; margin-bottom: 0.25rem; }
+  .subtitle { font-size: 14px; color: #666; margin-bottom: 1.5rem; }
+  .form-section { margin-bottom: 1.25rem; }
+  label { display: block; font-size: 13px; color: #555; font-weight: 500; margin-bottom: 5px; }
+  input, select, textarea {
+    width: 100%; padding: 9px 12px; border: 1px solid #ddd; border-radius: 8px;
+    font-size: 14px; font-family: inherit; background: #fff; color: #1a1a1a;
+  }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: #185FA5; box-shadow: 0 0 0 3px rgba(24,95,165,0.1); }
+  textarea { resize: vertical; min-height: 80px; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .recurrence-panel { background: #f5f5f3; border: 1px solid #e8e8e4; border-radius: 8px; padding: 0.875rem; margin-top: 8px; display: none; }
+  .recurrence-panel.visible { display: block; }
+  .recurrence-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .recurrence-row select { width: auto; flex: 1; min-width: 100px; }
+  .recurrence-row span { font-size: 13px; color: #666; white-space: nowrap; }
+  .badge { display: inline-block; font-size: 11px; padding: 2px 7px; border-radius: 99px; background: #E6F1FB; color: #185FA5; margin-left: 6px; }
+  .submit-btn { width: 100%; padding: 11px; background: #1a1a1a; color: #fff; border: none; border-radius: 8px; font-size: 15px; font-family: inherit; cursor: pointer; margin-top: 0.5rem; }
+  .submit-btn:hover { background: #333; }
+  .back-link { font-size: 13px; color: #185FA5; text-decoration: none; display: inline-block; margin-bottom: 1.25rem; }
+</style>
+</head>
+<body>
+<div class="container">
+  <a href="index.html" class="back-link">&larr; Back to events</a>
+  <h1>Submit a community event</h1>
+  <p class="subtitle">Submissions are reviewed before publishing. You will see your event listed once approved.</p>
+
+  <form name="event-submission" method="POST" data-netlify="true" action="/thank-you.html">
+    <input type="hidden" name="form-name" value="event-submission" />
+
+    <div class="form-section">
+      <label for="event-name">Event name</label>
+      <input type="text" id="event-name" name="event_name" placeholder="e.g. Community Lunch & Learn" required />
+    </div>
+
+    <div class="form-section">
+      <label for="organization">Organizing group or organization</label>
+      <input type="text" id="organization" name="organization" placeholder="e.g. Downtown Rotary Club" required />
+    </div>
+
+    <div class="form-section">
+      <label for="description">Description</label>
+      <textarea id="description" name="description" placeholder="What is this event about? Who should attend?" required></textarea>
+    </div>
+
+    <div class="form-section">
+      <label for="location">Location / address</label>
+      <input type="text" id="location" name="location" placeholder="e.g. 123 Main St, City Hall Room 2" required />
+    </div>
+
+    <div class="form-section">
+      <label for="event-url">Link to event details (optional)</label>
+      <input type="url" id="event-url" name="event_url" placeholder="https://" />
+    </div>
+
+    <div class="form-section">
+      <label>Event timing</label>
+      <div class="row">
+        <div>
+          <label for="start-time" style="font-size:12px;margin-bottom:4px;">Start time</label>
+          <input type="time" id="start-time" name="start_time" required />
+        </div>
+        <div>
+          <label for="end-time" style="font-size:12px;margin-bottom:4px;">End time (optional)</label>
+          <input type="time" id="end-time" name="end_time" />
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <label for="recurrence-type">How often does this event occur?</label>
+      <select id="recurrence-type" name="recurrence_type" onchange="showPanel(this.value)" required>
+        <option value="">— select —</option>
+        <option value="once">One-time only</option>
+        <option value="weekly">Weekly</option>
+        <option value="monthly-day">Monthly — by day (e.g. first Wednesday)</option>
+        <option value="monthly-date">Monthly — by date (e.g. every 15th)</option>
+      </select>
+
+      <div class="recurrence-panel" id="panel-once">
+        <label for="one-time-date" style="font-size:12px;margin-bottom:4px;">Date of event</label>
+        <input type="date" id="one-time-date" name="one_time_date" />
+      </div>
+
+      <div class="recurrence-panel" id="panel-weekly">
+        <div class="recurrence-row">
+          <span>Every</span>
+          <select name="weekly_day">
+            <option value="1">Monday</option><option value="2">Tuesday</option>
+            <option value="3">Wednesday</option><option value="4">Thursday</option>
+            <option value="5">Friday</option><option value="6">Saturday</option><option value="0">Sunday</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="recurrence-panel" id="panel-monthly-day">
+        <div class="recurrence-row">
+          <span>The</span>
+          <select name="monthly_week">
+            <option value="1">first</option><option value="2">second</option>
+            <option value="3">third</option><option value="4">fourth</option><option value="last">last</option>
+          </select>
+          <select name="monthly_weekday">
+            <option value="1">Monday</option><option value="2">Tuesday</option>
+            <option value="3">Wednesday</option><option value="4">Thursday</option>
+            <option value="5">Friday</option><option value="6">Saturday</option><option value="0">Sunday</option>
+          </select>
+          <span>of each month</span>
+        </div>
+      </div>
+
+      <div class="recurrence-panel" id="panel-monthly-date">
+        <div class="recurrence-row">
+          <span>Day</span>
+          <select name="monthly_date">
+            <option value="">— pick a date —</option>
+            <option value="1">1</option><option value="2">2</option><option value="3">3</option>
+            <option value="4">4</option><option value="5">5</option><option value="6">6</option>
+            <option value="7">7</option><option value="8">8</option><option value="9">9</option>
+            <option value="10">10</option><option value="11">11</option><option value="12">12</option>
+            <option value="13">13</option><option value="14">14</option><option value="15">15</option>
+            <option value="16">16</option><option value="17">17</option><option value="18">18</option>
+            <option value="19">19</option><option value="20">20</option><option value="21">21</option>
+            <option value="22">22</option><option value="23">23</option><option value="24">24</option>
+            <option value="25">25</option><option value="26">26</option><option value="27">27</option>
+            <option value="28">28</option><option value="29">29</option><option value="30">30</option>
+            <option value="31">31</option>
+          </select>
+          <span>of each month</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <label for="submitter-name">Your name <span class="badge">not published</span></label>
+      <input type="text" id="submitter-name" name="submitter_name" placeholder="So we can follow up if needed" />
+    </div>
+
+    <div class="form-section">
+      <label for="submitter-email">Your email <span class="badge">not published</span></label>
+      <input type="email" id="submitter-email" name="submitter_email" placeholder="your@email.com" />
+    </div>
+
+    <button type="submit" class="submit-btn">Submit event for review</button>
+  </form>
+</div>
+<script>
+function showPanel(val) {
+  ['once','weekly','monthly-day','monthly-date'].forEach(id => {
+    document.getElementById('panel-' + id).classList.toggle('visible', id === val);
+  });
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,420 @@
+<style>
+.dl-card { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: 12px; padding: 1rem 1.25rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 10px; }
+.dl-info { display: flex; flex-direction: column; gap: 3px; }
+.dl-name { font-weight: 500; font-size: 15px; }
+.dl-desc { font-size: 13px; color: var(--color-text-secondary); }
+.dl-btn { background: #1a1a1a; color: #fff; border: none; border-radius: 8px; padding: 8px 18px; font-size: 13px; cursor: pointer; white-space: nowrap; }
+.dl-btn:hover { opacity: 0.8; }
+h3 { font-size: 16px; font-weight: 500; margin: 0 0 1rem; }
+.note { font-size: 13px; color: var(--color-text-secondary); background: var(--color-background-secondary); border-radius: 8px; padding: 0.75rem 1rem; margin-top: 1rem; line-height: 1.6; }
+</style>
+
+<div style="padding: 1rem 0;">
+<h3>Download your site files</h3>
+
+<div class="dl-card">
+  <div class="dl-info">
+    <span class="dl-name">index.html</span>
+    <span class="dl-desc">Public events listing — sortable, filterable</span>
+  </div>
+  <button class="dl-btn" onclick="downloadIndex()">Download</button>
+</div>
+
+<div class="dl-card">
+  <div class="dl-info">
+    <span class="dl-name">submit.html</span>
+    <span class="dl-desc">Community event submission form</span>
+  </div>
+  <button class="dl-btn" onclick="downloadSubmit()">Download</button>
+</div>
+
+<div class="note">
+  Drop both files into the root of your GitHub repo, then connect it to Netlify. The form will be live immediately — submissions appear in your Netlify dashboard under <strong>Forms</strong>.
+</div>
+</div>
+
+<script>
+const indexHTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Community Events</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, sans-serif; background: #f9f9f7; color: #1a1a1a; padding: 2rem 1rem; }
+  .container { max-width: 700px; margin: 0 auto; }
+  h1 { font-size: 24px; font-weight: 600; margin-bottom: 0.25rem; }
+  .subtitle { font-size: 14px; color: #666; margin-bottom: 1.5rem; }
+  .subtitle a { color: #185FA5; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 1rem; }
+  .controls input, .controls select { flex: 1; min-width: 140px; padding: 8px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 13px; background: #fff; }
+  .count { font-size: 13px; color: #666; margin-bottom: 0.75rem; }
+  .event-list { display: flex; flex-direction: column; gap: 10px; }
+  .event-card { background: #fff; border: 1px solid #e8e8e8; border-radius: 12px; padding: 1rem 1.25rem; }
+  .event-card:hover { border-color: #ccc; }
+  .event-title { font-weight: 600; font-size: 15px; margin-bottom: 2px; }
+  .event-org { font-size: 13px; color: #185FA5; margin-bottom: 6px; }
+  .event-meta { font-size: 13px; color: #666; display: flex; flex-wrap: wrap; gap: 12px; }
+  .event-desc { font-size: 13px; color: #555; margin-top: 8px; line-height: 1.5; }
+  .event-footer { margin-top: 10px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .tag { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 99px; background: #f1f1ef; color: #555; border: 1px solid #e0e0dc; }
+  .event-link { font-size: 13px; color: #185FA5; text-decoration: none; }
+  .empty { text-align: center; color: #888; font-size: 14px; padding: 2rem 0; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Community Events</h1>
+  <p class="subtitle">Approved upcoming events. <a href="submit.html">Submit an event &rarr;</a></p>
+  <div class="controls">
+    <input type="text" id="search" placeholder="Search events..." oninput="render()" />
+    <select id="sort" onchange="render()">
+      <option value="date">Sort by date</option>
+      <option value="org">Sort by organization</option>
+      <option value="name">Sort by name</option>
+    </select>
+    <select id="filter-org" onchange="render()">
+      <option value="">All organizations</option>
+    </select>
+    <select id="filter-month" onchange="render()">
+      <option value="">All months</option>
+      <option value="0">January</option><option value="1">February</option><option value="2">March</option>
+      <option value="3">April</option><option value="4">May</option><option value="5">June</option>
+      <option value="6">July</option><option value="7">August</option><option value="8">September</option>
+      <option value="9">October</option><option value="10">November</option><option value="11">December</option>
+    </select>
+  </div>
+  <div class="count" id="count"></div>
+  <div class="event-list" id="list"></div>
+</div>
+<script>
+const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const WEEK_LABELS = ['','first','second','third','fourth','last'];
+
+/* =====================================================
+   EVENTS DATA — add approved events here
+   Each event object fields:
+     name        : string
+     org         : string
+     desc        : string
+     location    : string
+     url         : string (optional)
+     recurrence  : 'weekly' | 'monthly-day' | 'monthly-date' | 'once'
+     weekly_day        : 0-6 (Sun-Sat) — for weekly
+     monthly_week      : 1-4 or 'last' — for monthly-day
+     monthly_weekday   : 0-6 (Sun-Sat) — for monthly-day
+     monthly_date      : 1-31 — for monthly-date
+     one_time_date     : 'YYYY-MM-DD' — for once
+     start_time  : 'HH:MM' (24h)
+     end_time    : 'HH:MM' (24h, optional)
+===================================================== */
+const events = [
+  {
+    name: "Community Lunch & Learn",
+    org: "Downtown Rotary Club",
+    desc: "Monthly networking lunch open to all community members. Guest speakers on local topics.",
+    location: "City Hall, Room 2",
+    url: "https://example.com",
+    recurrence: "monthly-day",
+    monthly_week: 1,
+    monthly_weekday: 3,
+    start_time: "11:30",
+    end_time: "13:00"
+  }
+];
+
+function formatTime(t) {
+  if (!t) return '';
+  const [h, m] = t.split(':').map(Number);
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  return h % 12 || 12 + ':' + String(m).padStart(2,'0') + ' ' + ampm;
+}
+
+function recurrenceLabel(ev) {
+  if (ev.recurrence === 'weekly') return 'Every ' + DAYS[ev.weekly_day];
+  if (ev.recurrence === 'monthly-day') {
+    const w = WEEK_LABELS[ev.monthly_week];
+    return w.charAt(0).toUpperCase() + w.slice(1) + ' ' + DAYS[ev.monthly_weekday] + ' of the month';
+  }
+  if (ev.recurrence === 'monthly-date') {
+    const d = ev.monthly_date;
+    const s = ['th','st','nd','rd'][Math.min(d%10,3)] || 'th';
+    return 'Monthly on the ' + d + s;
+  }
+  return 'One-time event';
+}
+
+function nextOccurrence(ev) {
+  const now = new Date();
+  if (ev.recurrence === 'once') return new Date(ev.one_time_date);
+  if (ev.recurrence === 'weekly') {
+    const d = new Date(now);
+    const diff = (ev.weekly_day - d.getDay() + 7) % 7 || 7;
+    d.setDate(d.getDate() + diff);
+    return d;
+  }
+  if (ev.recurrence === 'monthly-day') {
+    for (let mo = 0; mo < 3; mo++) {
+      const base = new Date(now.getFullYear(), now.getMonth() + mo, 1);
+      let count = 0;
+      for (let day = 1; day <= 31; day++) {
+        const td = new Date(base.getFullYear(), base.getMonth(), day);
+        if (td.getMonth() !== base.getMonth()) break;
+        if (td.getDay() === ev.monthly_weekday) {
+          count++;
+          if (count === ev.monthly_week && td > now) return td;
+        }
+      }
+    }
+  }
+  if (ev.recurrence === 'monthly-date') {
+    for (let mo = 0; mo < 3; mo++) {
+      const td = new Date(now.getFullYear(), now.getMonth() + mo, ev.monthly_date);
+      if (td > now) return td;
+    }
+  }
+  return now;
+}
+
+function render() {
+  const search = document.getElementById('search').value.toLowerCase();
+  const sort = document.getElementById('sort').value;
+  const filterOrg = document.getElementById('filter-org').value;
+  const filterMonth = document.getElementById('filter-month').value;
+
+  let filtered = events.filter(ev => {
+    const text = (ev.name + ev.org + ev.desc + ev.location).toLowerCase();
+    if (search && !text.includes(search)) return false;
+    if (filterOrg && ev.org !== filterOrg) return false;
+    if (filterMonth !== '' && nextOccurrence(ev).getMonth() !== parseInt(filterMonth)) return false;
+    return true;
+  });
+
+  filtered.sort((a, b) => {
+    let va, vb;
+    if (sort === 'date') { va = nextOccurrence(a).getTime(); vb = nextOccurrence(b).getTime(); }
+    else if (sort === 'org') { va = a.org.toLowerCase(); vb = b.org.toLowerCase(); }
+    else { va = a.name.toLowerCase(); vb = b.name.toLowerCase(); }
+    return va < vb ? -1 : va > vb ? 1 : 0;
+  });
+
+  document.getElementById('count').textContent = filtered.length + ' event' + (filtered.length !== 1 ? 's' : '') + ' found';
+
+  const list = document.getElementById('list');
+  if (!filtered.length) { list.innerHTML = '<p class="empty">No events match your filters.</p>'; return; }
+
+  list.innerHTML = filtered.map(ev => {
+    const next = nextOccurrence(ev);
+    const dateStr = DAYS[next.getDay()] + ', ' + MONTHS[next.getMonth()] + ' ' + next.getDate();
+    const h = parseInt(ev.start_time), m = ev.start_time.split(':')[1];
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const timeStr = (h % 12 || 12) + ':' + m + ' ' + ampm + (ev.end_time ? ' \u2013 ' + formatTime(ev.end_time) : '');
+    return '<div class="event-card"><p class="event-title">' + ev.name + '</p><p class="event-org">' + ev.org + '</p>' +
+      '<div class="event-meta"><span>Next: ' + dateStr + '</span><span>' + timeStr + '</span><span>' + ev.location + '</span></div>' +
+      '<p class="event-desc">' + ev.desc + '</p>' +
+      '<div class="event-footer"><span class="tag">' + recurrenceLabel(ev) + '</span>' +
+      (ev.url ? '<a class="event-link" href="' + ev.url + '" target="_blank">Event details &rarr;</a>' : '') +
+      '</div></div>';
+  }).join('');
+}
+
+const orgs = [...new Set(events.map(e => e.org))].sort();
+const sel = document.getElementById('filter-org');
+orgs.forEach(o => { const opt = document.createElement('option'); opt.value = o; opt.textContent = o; sel.appendChild(opt); });
+render();
+<\/script>
+</body>
+</html>`;
+
+const submitHTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Submit a Community Event</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, sans-serif; background: #f9f9f7; color: #1a1a1a; padding: 2rem 1rem; }
+  .container { max-width: 640px; margin: 0 auto; }
+  h1 { font-size: 24px; font-weight: 600; margin-bottom: 0.25rem; }
+  .subtitle { font-size: 14px; color: #666; margin-bottom: 1.5rem; }
+  .form-section { margin-bottom: 1.25rem; }
+  label { display: block; font-size: 13px; color: #555; font-weight: 500; margin-bottom: 5px; }
+  input, select, textarea {
+    width: 100%; padding: 9px 12px; border: 1px solid #ddd; border-radius: 8px;
+    font-size: 14px; font-family: inherit; background: #fff; color: #1a1a1a;
+  }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: #185FA5; box-shadow: 0 0 0 3px rgba(24,95,165,0.1); }
+  textarea { resize: vertical; min-height: 80px; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .recurrence-panel { background: #f5f5f3; border: 1px solid #e8e8e4; border-radius: 8px; padding: 0.875rem; margin-top: 8px; display: none; }
+  .recurrence-panel.visible { display: block; }
+  .recurrence-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .recurrence-row select { width: auto; flex: 1; min-width: 100px; }
+  .recurrence-row span { font-size: 13px; color: #666; white-space: nowrap; }
+  .badge { display: inline-block; font-size: 11px; padding: 2px 7px; border-radius: 99px; background: #E6F1FB; color: #185FA5; margin-left: 6px; }
+  .submit-btn { width: 100%; padding: 11px; background: #1a1a1a; color: #fff; border: none; border-radius: 8px; font-size: 15px; font-family: inherit; cursor: pointer; margin-top: 0.5rem; }
+  .submit-btn:hover { background: #333; }
+  .back-link { font-size: 13px; color: #185FA5; text-decoration: none; display: inline-block; margin-bottom: 1.25rem; }
+</style>
+</head>
+<body>
+<div class="container">
+  <a href="index.html" class="back-link">&larr; Back to events</a>
+  <h1>Submit a community event</h1>
+  <p class="subtitle">Submissions are reviewed before publishing. You will see your event listed once approved.</p>
+
+  <form name="event-submission" method="POST" data-netlify="true" action="/thank-you.html">
+    <input type="hidden" name="form-name" value="event-submission" />
+
+    <div class="form-section">
+      <label for="event-name">Event name</label>
+      <input type="text" id="event-name" name="event_name" placeholder="e.g. Community Lunch &amp; Learn" required />
+    </div>
+
+    <div class="form-section">
+      <label for="organization">Organizing group or organization</label>
+      <input type="text" id="organization" name="organization" placeholder="e.g. Downtown Rotary Club" required />
+    </div>
+
+    <div class="form-section">
+      <label for="description">Description</label>
+      <textarea id="description" name="description" placeholder="What is this event about? Who should attend?" required></textarea>
+    </div>
+
+    <div class="form-section">
+      <label for="location">Location / address</label>
+      <input type="text" id="location" name="location" placeholder="e.g. 123 Main St, City Hall Room 2" required />
+    </div>
+
+    <div class="form-section">
+      <label for="event-url">Link to event details (optional)</label>
+      <input type="url" id="event-url" name="event_url" placeholder="https://" />
+    </div>
+
+    <div class="form-section">
+      <label>Event timing</label>
+      <div class="row">
+        <div>
+          <label for="start-time" style="font-size:12px;margin-bottom:4px;">Start time</label>
+          <input type="time" id="start-time" name="start_time" required />
+        </div>
+        <div>
+          <label for="end-time" style="font-size:12px;margin-bottom:4px;">End time</label>
+          <input type="time" id="end-time" name="end_time" />
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <label for="recurrence-type">How often does this event occur?</label>
+      <select id="recurrence-type" name="recurrence_type" onchange="showPanel(this.value)" required>
+        <option value="">— select —</option>
+        <option value="once">One-time only</option>
+        <option value="weekly">Weekly</option>
+        <option value="monthly-day">Monthly — by day (e.g. first Wednesday)</option>
+        <option value="monthly-date">Monthly — by date (e.g. every 15th)</option>
+      </select>
+
+      <div class="recurrence-panel" id="panel-once">
+        <label for="one-time-date" style="font-size:12px;margin-bottom:4px;">Date of event</label>
+        <input type="date" id="one-time-date" name="one_time_date" />
+      </div>
+
+      <div class="recurrence-panel" id="panel-weekly">
+        <div class="recurrence-row">
+          <span>Every</span>
+          <select name="weekly_day">
+            <option value="1">Monday</option><option value="2">Tuesday</option><option value="3">Wednesday</option>
+            <option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option><option value="0">Sunday</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="recurrence-panel" id="panel-monthly-day">
+        <div class="recurrence-row">
+          <span>The</span>
+          <select name="monthly_week">
+            <option value="1">first</option><option value="2">second</option>
+            <option value="3">third</option><option value="4">fourth</option><option value="last">last</option>
+          </select>
+          <select name="monthly_weekday">
+            <option value="1">Monday</option><option value="2">Tuesday</option><option value="3">Wednesday</option>
+            <option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option><option value="0">Sunday</option>
+          </select>
+          <span>of each month</span>
+        </div>
+      </div>
+
+      <div class="recurrence-panel" id="panel-monthly-date">
+        <div class="recurrence-row">
+          <span>Day</span>
+          <select name="monthly_date">
+            <option value="">— pick a date —</option>
+            ${Array.from({length:31},(_,i)=>\`<option value="\${i+1}">\${i+1}</option>\`).join('')}
+          </select>
+          <span>of each month</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <label for="submitter-name">Your name <span class="badge">not published</span></label>
+      <input type="text" id="submitter-name" name="submitter_name" placeholder="So we can follow up if needed" />
+    </div>
+
+    <div class="form-section">
+      <label for="submitter-email">Your email <span class="badge">not published</span></label>
+      <input type="email" id="submitter-email" name="submitter_email" placeholder="your@email.com" />
+    </div>
+
+    <button type="submit" class="submit-btn">Submit event for review</button>
+  </form>
+</div>
+<script>
+function showPanel(val) {
+  ['once','weekly','monthly-day','monthly-date'].forEach(id => {
+    const el = document.getElementById('panel-' + id);
+    el.classList.toggle('visible', id === val);
+  });
+}
+<\/script>
+</body>
+</html>`;
+
+const thankYouHTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Thank you!</title>
+<style>
+  body { font-family: system-ui, sans-serif; background: #f9f9f7; color: #1a1a1a; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 2rem; }
+  .card { background: #fff; border: 1px solid #e8e8e8; border-radius: 12px; padding: 2rem; max-width: 440px; text-align: center; }
+  h1 { font-size: 22px; margin-bottom: 0.5rem; }
+  p { font-size: 15px; color: #555; line-height: 1.6; margin-bottom: 1.25rem; }
+  a { display: inline-block; color: #185FA5; font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>Thanks for your submission!</h1>
+  <p>Your event has been received and will be reviewed before publishing. We may be in touch if we have any questions.</p>
+  <a href="index.html">&larr; Back to events</a>
+</div>
+</body>
+</html>`;
+
+function download(filename, content) {
+  const blob = new Blob([content], { type: 'text/html' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+}
+
+function downloadIndex() { download('index.html', indexHTML); }
+function downloadSubmit() { download('submit.html', submitHTML); }
+</script>
